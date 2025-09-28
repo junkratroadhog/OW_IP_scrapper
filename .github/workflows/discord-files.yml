@@ -15,28 +15,22 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Find and upload .ps1 and .bat files
+    - name: Upload each script to Discord
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       run: |
-        # Find all .ps1 and .bat files
         FILES=$(git ls-files '*.ps1' '*.bat')
-        
+
         if [ -z "$FILES" ]; then
           echo "No .ps1 or .bat files found."
           exit 0
         fi
 
-        # Build curl command
-        CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
-          -F 'payload_json={\"content\": \"Repo updated → sending scripts\"}'"
-
-        # Add each file separately
         for FILE in $FILES; do
-          CURL_CMD="$CURL_CMD -F file=@$FILE"
+          echo "Uploading $FILE..."
+          curl -H "Content-Type: multipart/form-data" \
+               -F "payload_json={\"content\": \"Repo updated → sending $FILE\"}" \
+               -F "file=@$FILE;type=application/octet-stream" \
+               "$DISCORD_WEBHOOK"
+          echo "$FILE uploaded successfully."
         done
-
-        CURL_CMD="$CURL_CMD \"$DISCORD_WEBHOOK\""
-
-        echo "Uploading files: $FILES"
-        eval $CURL_CMD

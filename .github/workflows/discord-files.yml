@@ -17,10 +17,20 @@ jobs:
         id: files
         shell: bash
         run: |
-          FILES=()
-          if [[ -f OW_IP.BAT ]]; then FILES+=("OW_IP.BAT"); fi
-          if [[ -f OW_IP_Scrapper.ps1 ]]; then FILES+=("OW_IP_Scrapper.ps1"); fi
+          #!/usr/bin/env bash
 
+          FILES=()
+
+          # Check for the two specific files
+          if [ -f OW_IP.BAT ]; then
+            FILES+=("OW_IP.BAT")
+          fi
+
+          if [ -f OW_IP_Scrapper.ps1 ]; then
+            FILES+=("OW_IP_Scrapper.ps1")
+          fi
+
+          # Output to GitHub Actions
           if [ ${#FILES[@]} -eq 0 ]; then
             echo "No files found to upload. Exiting."
             echo "files_found=false" >> $GITHUB_OUTPUT
@@ -33,6 +43,9 @@ jobs:
         if: steps.files.outputs.files_found == 'true'
         shell: bash
         run: |
+          #!/usr/bin/env bash
+
+          # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
           WEBHOOKS=()
           for name in $(printenv | grep '^DISCORD_WEBHOOK_' | cut -d= -f1); do
             WEBHOOKS+=("${!name}")
@@ -43,8 +56,10 @@ jobs:
             exit 0
           fi
 
+          # Split the files list from previous step
           IFS=' ' read -ra FILES_ARRAY <<< "${{ steps.files.outputs.files_list }}"
 
+          # Send all files in a single message per webhook
           for WEBHOOK in "${WEBHOOKS[@]}"; do
             echo "Uploading files to $WEBHOOK..."
             CURL_FILES=""

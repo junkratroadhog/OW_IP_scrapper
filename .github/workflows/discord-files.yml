@@ -15,14 +15,15 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: Upload each script to Discord
+    - name: Upload root scripts to Discord
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       run: |
-        FILES=$(git ls-files '*.ps1' '*.bat')
+        # Only pick .ps1 and .bat files in the repo root
+        FILES=$(git ls-files --exclude-standard --others --cached | grep -E '^[^/]+\.(ps1|bat)$')
 
         if [ -z "$FILES" ]; then
-          echo "No .ps1 or .bat files found."
+          echo "No .ps1 or .bat files found in root folder."
           exit 0
         fi
 

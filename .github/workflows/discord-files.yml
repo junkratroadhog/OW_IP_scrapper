@@ -11,11 +11,13 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-      - name: Prepare list of files to upload
-        id: files
+      - name: Check if root files exist
         shell: bash
+        id: detect_files
         run: |
           FILES="OW_IP.BAT OW_IP_Scrapper.ps1"
           echo "Files to upload: $FILES"
@@ -36,35 +38,32 @@ jobs:
             echo "All files found."
             echo "files_found=true" >> $GITHUB_OUTPUT
             echo "files_list=$FILES" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Send files to all Discord webhooks dynamically
-        if: steps.files.outputs.files_found == 'true'
+      - name: Upload files to Discord webhooks
+        if: steps.detect_files.outputs.files_found == 'true'
         shell: bash
         run: |
-          FILES="${{ steps.files.outputs.files_list }}"
+          FILES="${{ steps.detect_files.outputs.files_list }}"
           echo "Uploading files: $FILES"
 
-          # Detect all webhook secrets
+          # Dynamically detect all webhook secrets
           WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
-
-          if [ -z "$WEBHOOK_VARS" ]; then
-            echo "No Discord webhook secrets found. Exiting."
-            exit 0
-          fi
 
           for VAR_NAME in $WEBHOOK_VARS; do
             WEBHOOK=${!VAR_NAME}
             echo "Sending files to $VAR_NAME..."
 
-            CURL_FILES=""
+            # Build curl command to send all files in one message safely
+            CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
+                       -F 'payload_json={\"content\": \"Repo updated → sending OW_IP scripts\"}'"
+
             for FILE in $FILES; do
-              CURL_FILES+="-F file[]=@./$FILE "
+              CURL_CMD="$CURL_CMD -F \"file=@./$FILE;type=application/octet-stream\""
             done
 
-            curl -H "Content-Type: multipart/form-data" \
-                 -F "payload_json={\"content\": \"Repo updated → sending OW_IP files\"}" \
-                 $CURL_FILES \
-                 "$WEBHOOK" || true
+            # Execute curl command safely
+            eval $CURL_CMD || true
 
             echo "Files sent successfully to $VAR_NAME."
           done

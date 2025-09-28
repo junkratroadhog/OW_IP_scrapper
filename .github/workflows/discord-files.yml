@@ -3,33 +3,45 @@ name: Upload OW_IP Scripts to Discord
 on:
   push:
     branches:
-      - main  # run on push to main branch
+      - main  # Trigger on push to main branch
 
 jobs:
   send-to-discord:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Send files to Discord
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}  # set your webhook in repo secrets
-      run: |
-        # Change to folder containing the scripts
+      - name: Check if target files changed
+        id: check_files
+        run: |
+          # List changed files in the last commit
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+          echo "Changed files in last commit: $CHANGED_FILES"
 
-        # Make sure files exist
-        ls -ltr 
-        pwd
-        if [[ ! -f OW_IP_Scrapper.ps1 || ! -f OW_IP.bat ]]; then
-          echo "Required files not found!"
-          exit 1
-        fi
+          # Check if either OW_IP_Scrapper.ps1 or OW_IP.BAT changed
+          if echo "$CHANGED_FILES" | grep -qE '^(OW_IP_Scrapper\.ps1|OW_IP\.BAT)$'; then
+            echo "files_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "files_changed=false" >> $GITHUB_OUTPUT
 
-        # Send both files with a message
-        curl -H "Content-Type: multipart/form-data" \
-             -F "payload_json={\"content\": \"Repo updated → sending OW_IP_Scrapper.ps1 and OW_IP.bat\"}" \
-             -F "file[]=@OW_IP_Scrapper.ps1" \
-             -F "file[]=@OW_IP.bat" \
-             "$DISCORD_WEBHOOK"
+      - name: Send files to Discord
+        if: steps.check_files.outputs.files_changed == 'true'
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          echo "Sending OW_IP files to Discord..."
+
+          # Make sure files exist in repo root
+          if [[ ! -f OW_IP_Scrapper.ps1 || ! -f OW_IP.BAT ]]; then
+            echo "Required files not found!"
+            exit 1
+          fi
+
+          # Send files with a message
+          curl -H "Content-Type: multipart/form-data" \
+               -F "payload_json={\"content\": \"Repo updated → sending OW_IP_Scrapper.ps1 and OW_IP.BAT\"}" \
+               -F "file[]=@OW_IP_Scrapper.ps1" \
+               -F "file[]=@OW_IP.BAT" \
+               "$DISCORD_WEBHOOK"

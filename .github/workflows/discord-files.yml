@@ -10,36 +10,43 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
 
-    - name: Upload root scripts to all webhooks dynamically
-      run: |
-        # Find root .ps1 and .bat files (case-insensitive)
-        FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n" || true)
+      - name: Upload root scripts to all webhooks dynamically
+        run: |
+          # Move to the repository root
+          cd $GITHUB_WORKSPACE
 
-        if [ -z "$FILES" ]; then
-          echo "No .ps1 or .bat files found in root."
-          exit 0
-        fi
+          # Find root .ps1 and .bat files (case-insensitive)
+          FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n" || true)
 
-        # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
-        # GitHub automatically exposes secrets as environment variables
-        WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
+          if [ -z "$FILES" ]; then
+            echo "No .ps1 or .bat files found in root."
+            exit 0
+          fi
 
-        for VAR_NAME in $WEBHOOK_VARS; do
-          WEBHOOK=${!VAR_NAME}
-          echo "Sending files to $VAR_NAME..."
+          echo "Files to upload: $FILES"
 
-          # Send all files in one message
-          CURL_CMD="curl -H 'Content-Type: multipart/form-data' -F 'payload_json={\"content\": \"Repo updated → sending root scripts\"}'"
-          
-          for FILE in $FILES; do
-            CURL_CMD="$CURL_CMD -F file=@$FILE;type=application/octet-stream"
+          # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
+          WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
+
+          for VAR_NAME in $WEBHOOK_VARS; do
+            WEBHOOK=${!VAR_NAME}
+            echo "Sending files to $VAR_NAME..."
+
+            # Build curl command with all files
+            CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
+                       -F 'payload_json={\"content\": \"Repo updated → sending root scripts\"}'"
+
+            for FILE in $FILES; do
+              # Prepend ./ to ensure curl finds the file in the current directory
+              CURL_CMD="$CURL_CMD -F file=@./$FILE;type=application/octet-stream"
+            done
+
+            # Execute curl command
+            eval $CURL_CMD
+            echo "Files sent successfully to $VAR_NAME."
           done
-
-          eval $CURL_CMD
-          echo "Files sent successfully to $VAR_NAME."
-        done

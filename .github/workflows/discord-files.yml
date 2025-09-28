@@ -1,4 +1,4 @@
-name: Upload Root Scripts to Discord
+name: Upload OW_IP Scripts to Discord
 
 on:
   push:
@@ -11,43 +11,60 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
-      - name: Upload root scripts to all webhooks dynamically
+      - name: Prepare list of files to upload
+        id: files
         shell: bash
         run: |
-          # Move to the repository root
-          cd "$GITHUB_WORKSPACE"
+          FILES=()
 
-          # Find root .ps1 and .bat files (case-insensitive)
-          FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n" || true)
+          # Check for the two specific files
+          if [ -f OW_IP.BAT ]; then
+            FILES+=("OW_IP.BAT")
+          fi
 
-          if [ -z "$FILES" ]; then
-            echo "No .ps1 or .bat files found in root."
+          if [ -f OW_IP_Scrapper.ps1 ]; then
+            FILES+=("OW_IP_Scrapper.ps1")
+          fi
+
+          # Output to GitHub Actions
+          if [ ${#FILES[@]} -eq 0 ]; then
+            echo "No files found to upload. Exiting."
+            echo "files_found=false" >> $GITHUB_OUTPUT
+          else
+            echo "Files to upload: ${FILES[@]}"
+            echo "files_found=true" >> $GITHUB_OUTPUT
+            echo "files_list=${FILES[*]}" >> $GITHUB_OUTPUT
+
+      - name: Send files to all Discord webhooks dynamically
+        if: steps.files.outputs.files_found == 'true'
+        shell: bash
+        run: |
+          # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
+          WEBHOOKS=()
+          for name in $(printenv | grep '^DISCORD_WEBHOOK_' | cut -d= -f1); do
+            WEBHOOKS+=("${!name}")
+          done
+
+          if [ ${#WEBHOOKS[@]} -eq 0 ]; then
+            echo "No Discord webhook secrets found. Exiting."
             exit 0
           fi
 
-          echo "Files to upload: $FILES"
+          # Split the files list from previous step
+          IFS=' ' read -ra FILES_ARRAY <<< "${{ steps.files.outputs.files_list }}"
 
-          # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
-          WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
-
-          for VAR_NAME in $WEBHOOK_VARS; do
-            WEBHOOK=${!VAR_NAME}
-            echo "Sending files to $VAR_NAME..."
-
-            # Build curl command to send all files in a single message
-            CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
-                       -F 'payload_json={\"content\": \"Repo updated → sending root scripts\"}'"
-
-            for FILE in $FILES; do
-              CURL_CMD="$CURL_CMD -F file=@./$FILE;type=application/octet-stream"
+          # Send all files in a single message per webhook
+          for WEBHOOK in "${WEBHOOKS[@]}"; do
+            echo "Uploading files to $WEBHOOK..."
+            CURL_FILES=""
+            for f in "${FILES_ARRAY[@]}"; do
+              CURL_FILES+="-F file[]=@$f "
             done
 
-            # Execute curl command safely
-            eval $CURL_CMD || true
-
-            echo "Files sent successfully to $VAR_NAME."
+            eval curl -H "Content-Type: multipart/form-data" \
+                 -F "payload_json={\"content\": \"Repo updated → sending OW_IP files\"}" \
+                 $CURL_FILES \
+                 "$WEBHOOK"
           done

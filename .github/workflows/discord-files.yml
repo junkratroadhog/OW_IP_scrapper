@@ -17,30 +17,29 @@ jobs:
 
     - name: Upload root scripts to all webhooks dynamically
       run: |
-        # Find all root .ps1 and .bat files (case-insensitive)
-        FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n")
+        # Find root .ps1 and .bat files (case-insensitive)
+        FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n" || true)
 
         if [ -z "$FILES" ]; then
           echo "No .ps1 or .bat files found in root."
           exit 0
         fi
 
-        # Detect all environment variables starting with DISCORD_WEBHOOK_
+        # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
+        # GitHub automatically exposes secrets as environment variables
         WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
 
-        # Loop over each webhook dynamically
         for VAR_NAME in $WEBHOOK_VARS; do
           WEBHOOK=${!VAR_NAME}
           echo "Sending files to $VAR_NAME..."
 
-          # Build curl command for all files in one request
+          # Send all files in one message
           CURL_CMD="curl -H 'Content-Type: multipart/form-data' -F 'payload_json={\"content\": \"Repo updated → sending root scripts\"}'"
           
           for FILE in $FILES; do
             CURL_CMD="$CURL_CMD -F file=@$FILE;type=application/octet-stream"
           done
 
-          # Execute curl command
           eval $CURL_CMD
           echo "Files sent successfully to $VAR_NAME."
         done

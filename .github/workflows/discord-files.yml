@@ -22,7 +22,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
 
           # Find root .ps1 and .bat files (case-insensitive)
-          FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n" || true)
+          FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.BAT" \) -printf "%f\n" || true)
 
           if [ -z "$FILES" ]; then
             echo "No .ps1 or .bat files found in root."

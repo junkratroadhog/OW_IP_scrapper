@@ -15,37 +15,39 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if root files exist
-        shell: bash
+      - name: Detect root files
         id: detect_files
+        shell: bash
         run: |
-          FILES="OW_IP.BAT OW_IP_Scrapper.ps1"
-          echo "Files to upload: $FILES"
+          # Use a Bash array for root files
+          FILES=("OW_IP.BAT" "OW_IP_Scrapper.ps1")
+          UPLOAD_FILES=()
 
-          # Check if files exist
-          MISSING=0
-          for F in $FILES; do
-            if [ ! -f "$F" ]; then
-              echo "File $F not found!"
-              MISSING=1
+          # Only include files that exist
+          for F in "${FILES[@]}"; do
+            if [[ -f "$F" ]]; then
+              UPLOAD_FILES+=("$F")
+            else
+              echo "Warning: $F not found, skipping."
             fi
           done
 
-          if [ $MISSING -eq 1 ]; then
-            echo "Some files are missing. Exiting."
+          if [ ${#UPLOAD_FILES[@]} -eq 0 ]; then
+            echo "No files found to upload. Exiting."
             echo "files_found=false" >> $GITHUB_OUTPUT
           else
-            echo "All files found."
+            echo "Files to upload: ${UPLOAD_FILES[@]}"
             echo "files_found=true" >> $GITHUB_OUTPUT
-            echo "files_list=$FILES" >> $GITHUB_OUTPUT
+            echo "files_list=${UPLOAD_FILES[*]}" >> $GITHUB_OUTPUT
           fi
 
       - name: Upload files to Discord webhooks
         if: steps.detect_files.outputs.files_found == 'true'
         shell: bash
         run: |
-          FILES="${{ steps.detect_files.outputs.files_list }}"
-          echo "Uploading files: $FILES"
+          # Convert files_list output into an array
+          read -r -a FILES <<< "${{ steps.detect_files.outputs.files_list }}"
+          echo "Uploading files: ${FILES[@]}"
 
           # Detect all webhook secrets dynamically
           WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
@@ -54,14 +56,15 @@ jobs:
             WEBHOOK=${!VAR_NAME}
             echo "Sending files to $VAR_NAME..."
 
-            # Send each file individually to avoid parsing issues
-            for FILE in $FILES; do
-              echo "Uploading $FILE to $VAR_NAME..."
-              curl -H "Content-Type: multipart/form-data" \
-                   -F "payload_json={\"content\": \"Repo updated → sending $FILE\"}" \
-                   -F "file=@./$FILE;type=application/octet-stream" \
-                   "$WEBHOOK" || true
+            # Build a single curl command safely as an array
+            CURL_CMD=(curl -H "Content-Type: multipart/form-data" \
+                      -F 'payload_json={"content":"Repo updated → sending OW_IP scripts"}')
+
+            for FILE in "${FILES[@]}"; do
+              CURL_CMD+=(-F "file=@$FILE;type=application/octet-stream")
             done
 
+            # Execute curl safely
+            "${CURL_CMD[@]}" || true
             echo "Files sent successfully to $VAR_NAME."
           done

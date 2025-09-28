@@ -47,23 +47,21 @@ jobs:
           FILES="${{ steps.detect_files.outputs.files_list }}"
           echo "Uploading files: $FILES"
 
-          # Dynamically detect all webhook secrets
+          # Detect all webhook secrets dynamically
           WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
 
           for VAR_NAME in $WEBHOOK_VARS; do
             WEBHOOK=${!VAR_NAME}
             echo "Sending files to $VAR_NAME..."
 
-            # Build curl command to send all files in one message safely
-            CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
-                       -F 'payload_json={\"content\": \"Repo updated → sending OW_IP scripts\"}'"
-
+            # Send each file individually to avoid parsing issues
             for FILE in $FILES; do
-              CURL_CMD="$CURL_CMD -F \"file=@./$FILE;type=application/octet-stream\""
+              echo "Uploading $FILE to $VAR_NAME..."
+              curl -H "Content-Type: multipart/form-data" \
+                   -F "payload_json={\"content\": \"Repo updated → sending $FILE\"}" \
+                   -F "file=@./$FILE;type=application/octet-stream" \
+                   "$WEBHOOK" || true
             done
-
-            # Execute curl command safely
-            eval $CURL_CMD || true
 
             echo "Files sent successfully to $VAR_NAME."
           done

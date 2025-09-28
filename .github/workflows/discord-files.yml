@@ -18,7 +18,6 @@ jobs:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}  # set your webhook in repo secrets
       run: |
         # Change to folder containing the scripts
-        cd OW_IP_scrap
 
         # Make sure files exist
         if [[ ! -f OW_IP_Scrapper.ps1 || ! -f OW_IP.bat ]]; then

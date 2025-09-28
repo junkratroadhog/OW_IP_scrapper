@@ -15,7 +15,6 @@ jobs:
 
       - name: Verify files exist
         id: files
-        shell: bash
         run: |
           FILES="OW_IP.BAT OW_IP_Scrapper.ps1"
           MISSING=0
@@ -34,10 +33,10 @@ jobs:
             echo "All files found."
             echo "files_found=true" >> $GITHUB_OUTPUT
             echo "files_list=$FILES" >> $GITHUB_OUTPUT
+        shell: bash
 
       - name: Send files to all Discord webhooks dynamically
         if: steps.files.outputs.files_found == 'true'
-        shell: bash
         run: |
           FILES="${{ steps.files.outputs.files_list }}"
           echo "Uploading files: $FILES"
@@ -67,3 +66,4 @@ jobs:
 
             echo "Files sent successfully to $VAR_NAME."
           done
+        shell: bash

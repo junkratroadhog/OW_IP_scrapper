@@ -20,6 +20,8 @@ jobs:
         # Change to folder containing the scripts
 
         # Make sure files exist
+        ls -ltr 
+        pwd
         if [[ ! -f OW_IP_Scrapper.ps1 || ! -f OW_IP.bat ]]; then
           echo "Required files not found!"
           exit 1

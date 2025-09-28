@@ -1,21 +1,34 @@
-name: Send Files to Discord
+name: Upload OW_IP Scripts to Discord
 
 on:
   push:
     branches:
-      - main   # change if you use another branch
+      - main  # run on push to main branch
 
 jobs:
   send-to-discord:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repo
+      uses: actions/checkout@v3
 
-      - name: Send files to Discord
-        run: |
-          curl -F "payload_json={\"content\": \"Repo updated → sending OW_IP_Scrapper.ps1 and OW_IP.bat\"}" \
-               -F "file1=@OW_IP_Scrapper.ps1" \
-               -F "file2=@OW_IP.bat" \
-               ${{ secrets.DISCORD_WEBHOOK }}
+    - name: Set working directory
+      working-directory: OW_IP_scrap  # change to your folder containing the files
 
+    - name: Send files to Discord
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}  # set your webhook in repo secrets
+      run: |
+        # Make sure files exist
+        if [[ ! -f OW_IP_Scrapper.ps1 || ! -f OW_IP.bat ]]; then
+          echo "Required files not found!"
+          exit 1
+        fi
+
+        # Send both files with a message
+        curl -H "Content-Type: multipart/form-data" \
+             -F "payload_json={\"content\": \"Repo updated → sending OW_IP_Scrapper.ps1 and OW_IP.bat\"}" \
+             -F "file[]=@OW_IP_Scrapper.ps1" \
+             -F "file[]=@OW_IP.bat" \
+             "$DISCORD_WEBHOOK"

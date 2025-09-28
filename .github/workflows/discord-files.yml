@@ -13,15 +13,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Move to repository root
-        run: cd $GITHUB_WORKSPACE
-
       - name: Prepare list of files to upload
         id: files
+        shell: bash
         run: |
           FILES=()
-          [[ -f OW_IP.BAT ]] && FILES+=("OW_IP.BAT")
-          [[ -f OW_IP_Scrapper.ps1 ]] && FILES+=("OW_IP_Scrapper.ps1")
+          if [[ -f OW_IP.BAT ]]; then FILES+=("OW_IP.BAT"); fi
+          if [[ -f OW_IP_Scrapper.ps1 ]]; then FILES+=("OW_IP_Scrapper.ps1"); fi
 
           if [ ${#FILES[@]} -eq 0 ]; then
             echo "No files found to upload. Exiting."
@@ -33,6 +31,7 @@ jobs:
 
       - name: Send files to all Discord webhooks dynamically
         if: steps.files.outputs.files_found == 'true'
+        shell: bash
         run: |
           # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
           WEBHOOKS=()

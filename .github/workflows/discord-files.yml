@@ -3,45 +3,39 @@ name: Upload OW_IP Scripts to Discord
 on:
   push:
     branches:
-      - main  # Trigger on push to main branch
+      - main  # or your target branch
 
 jobs:
   send-to-discord:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    - name: Checkout repository
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0   # fetch full history to avoid HEAD^ errors
 
-      - name: Check if target files changed
-        id: check_files
-        run: |
-          # List changed files in the last commit
-          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
-          echo "Changed files in last commit: $CHANGED_FILES"
+    - name: Find and upload .ps1 and .bat files
+      env:
+        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      run: |
+        # Find all .ps1 and .bat files in repo
+        FILES=$(git ls-files '*.ps1' '*.bat')
+        
+        if [ -z "$FILES" ]; then
+          echo "No .ps1 or .bat files found to upload."
+          exit 0
+        fi
 
-          # Check if either OW_IP_Scrapper.ps1 or OW_IP.BAT changed
-          if echo "$CHANGED_FILES" | grep -qE '^(OW_IP_Scrapper\.ps1|OW_IP\.BAT)$'; then
-            echo "files_changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "files_changed=false" >> $GITHUB_OUTPUT
+        # Build curl command
+        CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
+          -F 'payload_json={\"content\": \"Repo updated → sending scripts\"}'"
 
-      - name: Send files to Discord
-        if: steps.check_files.outputs.files_changed == 'true'
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        run: |
-          echo "Sending OW_IP files to Discord..."
+        for FILE in $FILES; do
+          CURL_CMD="$CURL_CMD -F file[]=@$FILE"
+        done
 
-          # Make sure files exist in repo root
-          if [[ ! -f OW_IP_Scrapper.ps1 || ! -f OW_IP.BAT ]]; then
-            echo "Required files not found!"
-            exit 1
-          fi
+        CURL_CMD="$CURL_CMD \"$DISCORD_WEBHOOK\""
 
-          # Send files with a message
-          curl -H "Content-Type: multipart/form-data" \
-               -F "payload_json={\"content\": \"Repo updated → sending OW_IP_Scrapper.ps1 and OW_IP.BAT\"}" \
-               -F "file[]=@OW_IP_Scrapper.ps1" \
-               -F "file[]=@OW_IP.BAT" \
-               "$DISCORD_WEBHOOK"
+        # Run the curl command
+        eval $CURL_CMD

@@ -3,7 +3,7 @@ name: Upload OW_IP Scripts to Discord
 on:
   push:
     branches:
-      - main  # or your target branch
+      - main
 
 jobs:
   send-to-discord:
@@ -13,17 +13,17 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        fetch-depth: 0   # fetch full history to avoid HEAD^ errors
+        fetch-depth: 0
 
     - name: Find and upload .ps1 and .bat files
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       run: |
-        # Find all .ps1 and .bat files in repo
+        # Find all .ps1 and .bat files
         FILES=$(git ls-files '*.ps1' '*.bat')
         
         if [ -z "$FILES" ]; then
-          echo "No .ps1 or .bat files found to upload."
+          echo "No .ps1 or .bat files found."
           exit 0
         fi
 
@@ -31,11 +31,12 @@ jobs:
         CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
           -F 'payload_json={\"content\": \"Repo updated → sending scripts\"}'"
 
+        # Add each file separately
         for FILE in $FILES; do
-          CURL_CMD="$CURL_CMD -F file[]=@$FILE"
+          CURL_CMD="$CURL_CMD -F file=@$FILE"
         done
 
         CURL_CMD="$CURL_CMD \"$DISCORD_WEBHOOK\""
 
-        # Run the curl command
+        echo "Uploading files: $FILES"
         eval $CURL_CMD

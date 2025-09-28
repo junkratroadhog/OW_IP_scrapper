@@ -1,4 +1,4 @@
-name: Upload Root Scripts to Discord
+name: Upload OW_IP Scripts to Discord
 
 on:
   push:
@@ -10,34 +10,47 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        fetch-depth: 0
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Upload root scripts to all webhooks dynamically
-      run: |
-        # Find .ps1 and .bat files in the repo root (case-insensitive)
-        FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n")
-
-        if [ -z "$FILES" ]; then
-          echo "No .ps1 or .bat files found in root."
-          exit 0
-        fi
-
-        # Loop over all files
-        for FILE in $FILES; do
-          echo "Uploading $FILE to all webhooks..."
+      - name: Check if target files changed
+        id: check_files
+        run: |
+          # List files in the last commit
+          CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r $GITHUB_SHA)
+          echo "Changed files: $CHANGED_FILES"
           
-          # Loop over all secrets that start with DISCORD_WEBHOOK_
-          for SECRET_NAME in $(gh secret list | grep '^DISCORD_WEBHOOK_' | awk '{print $1}'); do
-            WEBHOOK=$(gh secret get "$SECRET_NAME")
+          if echo "$CHANGED_FILES" | grep -qE '^(OW_IP_Scrapper\.ps1|OW_IP\.BAT)$'; then
+            echo "files_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "files_changed=false" >> $GITHUB_OUTPUT
+
+      - name: Send both files in a single message to multiple Discord webhooks
+        if: steps.check_files.outputs.files_changed == 'true'
+        env:
+          DISCORD_WEBHOOKS: ${{ secrets.DISCORD_WEBHOOKS }}
+        run: |
+          if [[ -z "$DISCORD_WEBHOOKS" ]]; then
+            echo "No Discord webhooks defined. Exiting..."
+            exit 0
+          fi
+
+          # Split the comma-separated webhooks into an array
+          IFS=',' read -ra WEBHOOK_ARRAY <<< "$DISCORD_WEBHOOKS"
+          
+          # Send both files to each webhook
+          for WEBHOOK in "${WEBHOOK_ARRAY[@]}"; do
+            echo "Uploading OW_IP.BAT and OW_IP_Scrapper.ps1 to $WEBHOOK..."
             
+            # Check if files exist
+            if [[ ! -f OW_IP.BAT || ! -f OW_IP_Scrapper.ps1 ]]; then
+              echo "One or both files are missing. Skipping this webhook."
+              continue
+            fi
+
             curl -H "Content-Type: multipart/form-data" \
-                 -F "payload_json={\"content\": \"Repo updated → sending $FILE\"}" \
-                 -F "file=@$FILE;type=application/octet-stream" \
+                 -F "payload_json={\"content\": \"Repo updated → sending OW_IP_Scrapper.ps1 and OW_IP.BAT\"}" \
+                 -F "file1=@OW_IP.BAT" \
+                 -F "file2=@OW_IP_Scrapper.ps1" \
                  "$WEBHOOK"
           done
-
-          echo "$FILE uploaded to all webhooks successfully."
-        done

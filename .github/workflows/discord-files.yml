@@ -11,60 +11,59 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v4
 
-      - name: Detect root files
-        id: detect_files
+      - name: Verify files exist
+        id: files
         shell: bash
         run: |
-          # Use a Bash array for root files
-          FILES=("OW_IP.BAT" "OW_IP_Scrapper.ps1")
-          UPLOAD_FILES=()
+          FILES="OW_IP.BAT OW_IP_Scrapper.ps1"
+          MISSING=0
 
-          # Only include files that exist
-          for F in "${FILES[@]}"; do
-            if [[ -f "$F" ]]; then
-              UPLOAD_FILES+=("$F")
-            else
-              echo "Warning: $F not found, skipping."
+          for F in $FILES; do
+            if [ ! -f "$F" ]; then
+              echo "File $F not found!"
+              MISSING=1
             fi
           done
 
-          if [ ${#UPLOAD_FILES[@]} -eq 0 ]; then
-            echo "No files found to upload. Exiting."
+          if [ $MISSING -eq 1 ]; then
+            echo "Some files are missing. Exiting."
             echo "files_found=false" >> $GITHUB_OUTPUT
           else
-            echo "Files to upload: ${UPLOAD_FILES[@]}"
+            echo "All files found."
             echo "files_found=true" >> $GITHUB_OUTPUT
-            echo "files_list=${UPLOAD_FILES[*]}" >> $GITHUB_OUTPUT
-          fi
+            echo "files_list=$FILES" >> $GITHUB_OUTPUT
 
-      - name: Upload files to Discord webhooks
-        if: steps.detect_files.outputs.files_found == 'true'
+      - name: Send files to all Discord webhooks dynamically
+        if: steps.files.outputs.files_found == 'true'
         shell: bash
         run: |
-          # Convert files_list output into an array
-          read -r -a FILES <<< "${{ steps.detect_files.outputs.files_list }}"
-          echo "Uploading files: ${FILES[@]}"
+          FILES="${{ steps.files.outputs.files_list }}"
+          echo "Uploading files: $FILES"
 
           # Detect all webhook secrets dynamically
           WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
+          if [ -z "$WEBHOOK_VARS" ]; then
+            echo "No Discord webhook secrets found. Exiting."
+            exit 0
+          fi
 
           for VAR_NAME in $WEBHOOK_VARS; do
             WEBHOOK=${!VAR_NAME}
             echo "Sending files to $VAR_NAME..."
 
-            # Build a single curl command safely as an array
-            CURL_CMD=(curl -H "Content-Type: multipart/form-data" \
-                      -F 'payload_json={"content":"Repo updated → sending OW_IP scripts"}')
+            # Build curl command as a string
+            CURL_CMD="curl -H 'Content-Type: multipart/form-data' -F 'payload_json={\"content\":\"Repo updated → sending OW_IP scripts\"}'"
 
-            for FILE in "${FILES[@]}"; do
-              CURL_CMD+=(-F "file=@$FILE;type=application/octet-stream")
+            for FILE in $FILES; do
+              CURL_CMD+=" -F 'file[]=@$FILE;type=application/octet-stream'"
             done
 
-            # Execute curl safely
-            "${CURL_CMD[@]}" || true
+            CURL_CMD+=" $WEBHOOK"
+
+            # Execute safely and continue even if curl fails
+            eval $CURL_CMD || echo "Warning: Failed to send to $VAR_NAME, continuing..."
+
             echo "Files sent successfully to $VAR_NAME."
           done

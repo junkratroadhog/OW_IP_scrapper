@@ -13,26 +13,31 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        fetch-depth: 0  # ensures full Git history if needed
+        fetch-depth: 0
 
-    - name: Upload root scripts to Discord
-      env:
-        DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+    - name: Upload root scripts to all webhooks dynamically
       run: |
-        # Find .ps1 and .bat files only in the repo root, case-insensitive
+        # Find .ps1 and .bat files in the repo root (case-insensitive)
         FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n")
 
         if [ -z "$FILES" ]; then
-          echo "No .ps1 or .bat files found in the root folder."
+          echo "No .ps1 or .bat files found in root."
           exit 0
         fi
 
-        # Upload each file individually
+        # Loop over all files
         for FILE in $FILES; do
-          echo "Uploading $FILE..."
-          curl -H "Content-Type: multipart/form-data" \
-               -F "payload_json={\"content\": \"Repo updated → sending $FILE\"}" \
-               -F "file=@$FILE;type=application/octet-stream" \
-               "$DISCORD_WEBHOOK"
-          echo "$FILE uploaded successfully."
+          echo "Uploading $FILE to all webhooks..."
+          
+          # Loop over all secrets that start with DISCORD_WEBHOOK_
+          for SECRET_NAME in $(gh secret list | grep '^DISCORD_WEBHOOK_' | awk '{print $1}'); do
+            WEBHOOK=$(gh secret get "$SECRET_NAME")
+            
+            curl -H "Content-Type: multipart/form-data" \
+                 -F "payload_json={\"content\": \"Repo updated → sending $FILE\"}" \
+                 -F "file=@$FILE;type=application/octet-stream" \
+                 "$WEBHOOK"
+          done
+
+          echo "$FILE uploaded to all webhooks successfully."
         done

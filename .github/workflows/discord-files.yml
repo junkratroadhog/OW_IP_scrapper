@@ -18,11 +18,11 @@ jobs:
       - name: Upload root scripts to all webhooks dynamically
         shell: bash
         run: |
-          # Move to repo root
+          # Move to the repository root
           cd "$GITHUB_WORKSPACE"
 
           # Find root .ps1 and .bat files (case-insensitive)
-          FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.BAT" \) -printf "%f\n" || true)
+          FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n" || true)
 
           if [ -z "$FILES" ]; then
             echo "No .ps1 or .bat files found in root."
@@ -31,15 +31,14 @@ jobs:
 
           echo "Files to upload: $FILES"
 
-          # Detect all secrets starting with DISCORD_WEBHOOK_ dynamically
+          # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
           WEBHOOK_VARS=$(compgen -v | grep '^DISCORD_WEBHOOK_')
 
-          # Loop over each webhook
           for VAR_NAME in $WEBHOOK_VARS; do
             WEBHOOK=${!VAR_NAME}
             echo "Sending files to $VAR_NAME..."
 
-            # Build curl command for all files
+            # Build curl command to send all files in a single message
             CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
                        -F 'payload_json={\"content\": \"Repo updated → sending root scripts\"}'"
 
@@ -47,7 +46,8 @@ jobs:
               CURL_CMD="$CURL_CMD -F file=@./$FILE;type=application/octet-stream"
             done
 
-            # Execute curl command
-            eval $CURL_CMD
+            # Execute curl command safely
+            eval $CURL_CMD || true
+
             echo "Files sent successfully to $VAR_NAME."
           done

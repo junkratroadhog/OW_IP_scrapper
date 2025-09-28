@@ -53,15 +53,13 @@ jobs:
             WEBHOOK=${!VAR_NAME}
             echo "Sending files to $VAR_NAME..."
 
-            # Build curl command for all files in one message
-            CURL_CMD="curl -H 'Content-Type: multipart/form-data' \
-                       -F 'payload_json={\"content\": \"Repo updated → sending OW_IP scripts\"}'"
-
+            # Send each file individually in the same message
             for FILE in $FILES; do
-              CURL_CMD="$CURL_CMD -F file=@./$FILE;type=application/octet-stream"
+              curl -H "Content-Type: multipart/form-data" \
+                   -F "payload_json={\"content\": \"Repo updated → sending $FILE\"}" \
+                   -F "file=@./$FILE;type=application/octet-stream" \
+                   "$WEBHOOK" || true
             done
 
-            # Execute curl command safely
-            eval $CURL_CMD || true
             echo "Files sent successfully to $VAR_NAME."
           done

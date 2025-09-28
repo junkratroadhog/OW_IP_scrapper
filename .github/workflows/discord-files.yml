@@ -13,13 +13,13 @@ jobs:
     - name: Checkout repo
       uses: actions/checkout@v3
 
-    - name: Set working directory
-      working-directory: OW_IP_scrap  # change to your folder containing the files
-
     - name: Send files to Discord
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}  # set your webhook in repo secrets
       run: |
+        # Change to folder containing the scripts
+        cd OW_IP_scrap
+
         # Make sure files exist
         if [[ ! -f OW_IP_Scrapper.ps1 || ! -f OW_IP.bat ]]; then
           echo "Required files not found!"

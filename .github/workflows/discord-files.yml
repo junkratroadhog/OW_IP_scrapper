@@ -1,4 +1,4 @@
-name: Upload OW_IP Scripts to Discord
+name: Upload Root Scripts to Discord
 
 on:
   push:
@@ -13,20 +13,21 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
       with:
-        fetch-depth: 0
+        fetch-depth: 0  # ensures full Git history if needed
 
     - name: Upload root scripts to Discord
       env:
         DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
       run: |
-        # Only pick .ps1 and .bat files in the repo root
-        FILES=$(git ls-files --exclude-standard --others --cached | grep -E '^[^/]+\.(ps1|bat)$')
+        # Find .ps1 and .bat files only in the repo root, case-insensitive
+        FILES=$(find . -maxdepth 1 -type f \( -iname "*.ps1" -o -iname "*.bat" \) -printf "%f\n")
 
         if [ -z "$FILES" ]; then
-          echo "No .ps1 or .bat files found in root folder."
+          echo "No .ps1 or .bat files found in the root folder."
           exit 0
         fi
 
+        # Upload each file individually
         for FILE in $FILES; do
           echo "Uploading $FILE..."
           curl -H "Content-Type: multipart/form-data" \

@@ -1,0 +1,21 @@
+name: Send Files to Discord
+
+on:
+  push:
+    branches:
+      - main   # change if you use another branch
+
+jobs:
+  send-to-discord:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Send files to Discord
+        run: |
+          curl -F "payload_json={\"content\": \"Repo updated → sending OW_IP_Scrapper.ps1 and OW_IP.bat\"}" \
+               -F "file1=@OW_IP_Scrapper.ps1" \
+               -F "file2=@OW_IP.bat" \
+               ${{ secrets.DISCORD_WEBHOOK }}
+

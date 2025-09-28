@@ -17,8 +17,6 @@ jobs:
         id: files
         shell: bash
         run: |
-          #!/usr/bin/env bash
-
           FILES=()
 
           # Check for the two specific files
@@ -43,8 +41,6 @@ jobs:
         if: steps.files.outputs.files_found == 'true'
         shell: bash
         run: |
-          #!/usr/bin/env bash
-
           # Dynamically detect all secrets starting with DISCORD_WEBHOOK_
           WEBHOOKS=()
           for name in $(printenv | grep '^DISCORD_WEBHOOK_' | cut -d= -f1); do
